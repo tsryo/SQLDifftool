@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SQL Difftool</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='3' y='5' width='15' height='22' rx='3' fill='%232563eb'/%3E%3Crect x='14' y='5' width='15' height='22' rx='3' fill='%23a21caf' fill-opacity='.85'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+
+<!-- ============ Connect view ============ -->
+<section id="connect-view" class="view" hidden>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true"><i></i><i></i></span>
+      <span class="brand-name">SQL Difftool</span>
+      <span class="brand-sub">Schema compare for SQL Server</span>
+    </div>
+    <div class="profiles">
+      <label for="profile-select">Profile</label>
+      <select id="profile-select"><option value="">(none)</option></select>
+      <button id="profile-save" class="btn ghost" type="button">Save as…</button>
+      <button id="profile-delete" class="btn ghost" type="button" disabled>Delete</button>
+    </div>
+  </header>
+
+  <main class="connect-main">
+    <div class="sides">
+      <form id="card-left" class="side-card side-a" data-side="left" autocomplete="off"></form>
+      <button id="swap-sides" class="swap" type="button" title="Swap left and right">&#8644;</button>
+      <form id="card-right" class="side-card side-b" data-side="right" autocomplete="off"></form>
+    </div>
+
+    <div class="card options-card">
+      <h3>Comparison options</h3>
+      <div id="connect-options" class="option-grid"></div>
+      <label class="field excludes-field">
+        <span>Exclude objects</span>
+        <input id="excludes" type="text" placeholder="staging.*, dbo.tmp_*, *_bak" spellcheck="false" autocomplete="off">
+        <small>Comma-separated wildcard patterns, matched against <code>schema.name</code> and <code>name</code>.</small>
+      </label>
+    </div>
+
+    <div class="compare-actions">
+      <button id="compare-btn" class="btn primary large" type="button">Compare schemas</button>
+      <span class="hint">Read-only: the tool only runs SELECT queries against the system catalog.</span>
+    </div>
+  </main>
+</section>
+
+<!-- ============ Diff view ============ -->
+<section id="diff-view" class="view" hidden>
+  <header class="topbar diff-top">
+    <button id="back-btn" class="btn ghost" type="button" title="Back to the connection form">&#8592; New comparison</button>
+    <span class="report-badge">Saved report</span>
+    <div class="envs">
+      <div id="env-left" class="env env-a"></div>
+      <span class="envs-vs" aria-hidden="true">&#8644;</span>
+      <div id="env-right" class="env env-b"></div>
+    </div>
+    <div class="top-right">
+      <span id="compared-at" class="muted"></span>
+      <a id="download-report" class="btn" href="#" download>Download report</a>
+    </div>
+  </header>
+
+  <div class="summary-bar">
+    <div id="status-chips" class="chips" role="group" aria-label="Filter by status"></div>
+    <div id="diff-options" class="opt-pills" role="group" aria-label="Normalization options"></div>
+    <div id="db-props" class="db-props"></div>
+  </div>
+  <div id="warnings"></div>
+
+  <div class="diff-body">
+    <aside class="sidebar">
+      <div class="search-wrap">
+        <input id="search" type="search" placeholder="Filter objects" autocomplete="off" spellcheck="false" aria-label="Filter objects">
+        <kbd>/</kbd>
+      </div>
+      <nav id="tree" aria-label="Objects"></nav>
+      <div class="kbd-help"><kbd>n</kbd><kbd>p</kbd> next / previous &nbsp; <kbd>u</kbd> unified &nbsp; <kbd>e</kbd> expand</div>
+    </aside>
+    <main id="detail" class="detail"></main>
+  </div>
+</section>
+
+<!-- ============ Side card template ============ -->
+<template id="side-template">
+  <div class="side-head">
+    <span class="side-dot" aria-hidden="true"></span>
+    <input class="side-label" data-f="label" maxlength="16" aria-label="Environment label" spellcheck="false">
+    <span class="side-hint"></span>
+  </div>
+  <label class="field">
+    <span>Server</span>
+    <input data-f="server" placeholder="host\instance  or  host,port" autocomplete="off" spellcheck="false">
+  </label>
+  <label class="field">
+    <span>Database</span>
+    <span class="with-btn">
+      <input data-f="database" autocomplete="off" spellcheck="false" placeholder="Database name">
+      <button type="button" class="btn ghost icon" data-act="dbs" title="List databases on this server">&#8635;</button>
+    </span>
+    <datalist></datalist>
+  </label>
+  <div class="field">
+    <span>Authentication</span>
+    <div class="segmented" role="group" aria-label="Authentication">
+      <button type="button" data-auth="windows">Windows</button>
+      <button type="button" data-auth="sql">SQL login</button>
+      <button type="button" data-auth="connstr">Connection string</button>
+    </div>
+  </div>
+  <div class="auth-sql two-col">
+    <label class="field"><span>User</span><input data-f="username" autocomplete="off" spellcheck="false"></label>
+    <label class="field"><span>Password</span><input data-f="password" type="password" autocomplete="off"></label>
+  </div>
+  <label class="field auth-connstr">
+    <span>ODBC connection string</span>
+    <textarea data-f="connection_string" rows="3" spellcheck="false"
+      placeholder="Server=tcp:myserver.database.windows.net;Database=Sales;Authentication=ActiveDirectoryInteractive;UID=me@corp.com"></textarea>
+    <small>The database field above is added if the string has none.</small>
+  </label>
+  <div class="checks">
+    <label><input type="checkbox" data-f="encrypt"> Encrypt</label>
+    <label><input type="checkbox" data-f="trust_server_certificate"> Trust server certificate</label>
+  </div>
+  <div class="side-foot">
+    <button type="button" class="btn" data-act="test">Test connection</button>
+    <div class="test-result" aria-live="polite"></div>
+  </div>
+</template>
+
+<div id="busy" class="busy" hidden>
+  <div class="busy-box">
+    <div class="spinner" aria-hidden="true"></div>
+    <div id="busy-text">Working…</div>
+    <div id="busy-time" class="muted"></div>
+  </div>
+</div>
+<div id="toast" class="toast" role="status" hidden></div>
+
+<script src="/static/sqlhighlight.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>
