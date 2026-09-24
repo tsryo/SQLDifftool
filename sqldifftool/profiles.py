@@ -1,4 +1,4 @@
-"""Saved DEV/ACC connection pairs. Passwords are never written to disk."""
+"""Saved left/right connection pairs. Passwords are never written to disk."""
 from __future__ import annotations
 
 import json

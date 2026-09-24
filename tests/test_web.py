@@ -27,7 +27,7 @@ def test_index_is_served(client):
 
 def test_compare_payload(client, cid):
     data = client.get(f"/api/compare/{cid}").get_json()
-    assert data["left"]["label"] == "DEV" and data["right"]["label"] == "ACC"
+    assert data["left"]["label"] == "Left" and data["right"]["label"] == "Right"
     assert data["summary"]["different"] == 11
     assert {o["status"] for o in data["objects"]} == {"different", "only_left", "only_right", "identical"}
     compat = next(p for p in data["dbProperties"] if p["name"] == "Compatibility level")

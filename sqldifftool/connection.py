@@ -10,7 +10,7 @@ QUERY_TIMEOUT_SECONDS = 300
 
 @dataclass
 class ConnectionSpec:
-    label: str = "DEV"
+    label: str = "Left"
     server: str = ""
     database: str = ""
     auth: str = "windows"            # windows | sql | connstr

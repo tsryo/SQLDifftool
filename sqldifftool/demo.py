@@ -1,4 +1,4 @@
-"""Two built-in sample snapshots (a "Sales" database on DEV and ACC) for --demo mode and tests.
+"""Two built-in sample snapshots (a "Sales" database on a development and an acceptance server) for --demo mode and tests.
 
 The differences are chosen to exercise every status and normalization option:
 added/changed columns, a changed procedure, whitespace-only, comment-only and
@@ -452,8 +452,8 @@ def _objects(dev: bool) -> list[DbObject]:
 def build_demo_snapshots() -> tuple[Snapshot, Snapshot]:
     encrypted = [{"level": "info", "text": (
         "1 module(s) are encrypted (WITH ENCRYPTION); their definitions cannot be compared.")}]
-    dev = Snapshot("DEV", "sql-dev01", "Sales", "SQL Server 2022 (16.0.4135.4)", "Developer Edition (64-bit)",
+    dev = Snapshot("Left", "sql-dev01", "Sales", "SQL Server 2022 (16.0.4135.4)", "Developer Edition (64-bit)",
                    COLLATION, 160, "2026-09-23T09:14:02", list(encrypted), _objects(True))
-    acc = Snapshot("ACC", "sql-acc01", "Sales", "SQL Server 2019 (15.0.4375.4)", "Standard Edition (64-bit)",
+    acc = Snapshot("Right", "sql-acc01", "Sales", "SQL Server 2019 (15.0.4375.4)", "Standard Edition (64-bit)",
                    COLLATION, 150, "2026-09-23T09:14:03", list(encrypted), _objects(False))
     return dev, acc

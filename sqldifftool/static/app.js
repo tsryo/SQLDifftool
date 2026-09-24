@@ -199,7 +199,7 @@
       const f = el.dataset.f;
       spec[f] = el.type === 'checkbox' ? el.checked : (f === 'password' ? el.value : el.value.trim());
     });
-    if (!spec.label) spec.label = side === 'left' ? 'DEV' : 'ACC';
+    if (!spec.label) spec.label = side === 'left' ? 'Left' : 'Right';
     return spec;
   }
 
@@ -211,7 +211,7 @@
       if (el.type === 'checkbox') el.checked = !!spec[f];
       else el.value = spec[f] == null ? '' : spec[f];
     });
-    if (!$('[data-f=label]', card).value) $('[data-f=label]', card).value = side === 'left' ? 'DEV' : 'ACC';
+    if (!$('[data-f=label]', card).value) $('[data-f=label]', card).value = side === 'left' ? 'Left' : 'Right';
     setAuth(side, spec.auth || 'windows');
     setSource(side, spec.source === 'files' ? 'files' : 'db');
     $$('.test-result', card).forEach(el => { el.textContent = ''; el.className = 'test-result'; });
@@ -257,8 +257,8 @@
 
   function restoreForm() {
     const saved = storageGet() || {};
-    writeSide('left', saved.left || { label: 'DEV' });
-    writeSide('right', saved.right || { label: 'ACC' });
+    writeSide('left', saved.left || { label: 'Left' });
+    writeSide('right', saved.right || { label: 'Right' });
     writeOptions(saved.options);
     $('#excludes').value = saved.excludes || '';
     return saved;

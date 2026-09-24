@@ -1,6 +1,6 @@
 # SQL Difftool
 
-Compare the schema of two SQL Server databases (for example DEV and ACC) and browse the differences in a side-by-side diff in your browser.
+Compare the schema of two SQL Server databases (for example development and acceptance) and browse the differences in a side-by-side diff in your browser.
 
 It covers tables (columns, keys, checks, foreign keys, indexes), views, stored procedures, functions, triggers, user-defined types, sequences, synonyms and schemas. It also compares the database collation and compatibility level.
 
@@ -23,26 +23,26 @@ python -m virtualenv .venv        # or: python -m venv .venv
 
 A browser opens at http://127.0.0.1:8765. The server listens on this machine only.
 
-1. Fill in the **DEV** and **ACC** cards: server (`host\instance` or `host,port`), database and authentication.
+1. Fill in the **Left** and **Right** cards: server (`host\instance` or `host,port`), database and authentication.
    - Authentication is Windows, SQL login, or a raw ODBC connection string (for example for Entra ID / `ActiveDirectoryInteractive`).
    - **Test connection** checks the login and permissions.
    - **↻** lists the databases on that server.
-   - The labels are editable, so you can compare ACC with PRD too.
+   - The labels are editable, for example to name the sides DEV and ACC. They are used throughout the results.
 2. Click **Compare schemas**.
 3. Browse the results:
-   - The left tree groups objects by type. Filter with the status chips (Different / Only in DEV / Only in ACC / Identical) or the search box.
+   - The left tree groups objects by type. Filter with the status chips (Different / Only in Left / Only in Right / Identical) or the search box.
    - Toggle the normalization options in the top bar. They re-diff instantly without querying the databases again.
    - **Download report** saves a single, self-contained HTML file you can attach to a release ticket. It works offline.
 
 Keyboard: `n`/`p` next/previous object, `/` search, `u` side-by-side ↔ unified, `e` show all lines.
 
-**Save as…** stores a DEV/ACC pair as a profile in `%USERPROFILE%\.sqldifftool\profiles.json`. Passwords are never saved, including `PWD=` inside connection strings.
+**Save as…** stores a left/right pair as a profile in `%USERPROFILE%\.sqldifftool\profiles.json`. Passwords are never saved, including `PWD=` inside connection strings.
 
 To try the tool without a database, run `.\sqldifftool.cmd --demo`. It opens a built-in sample comparison.
 
 ## Offline mode (script files)
 
-You can also compare without connecting to the databases. Switch a card from **Database** to **Script files** and pick exported DDL scripts: **Choose files…** for one or more `.sql` files, or **Choose folder…** for a whole export folder. You can mix sources, for example DEV from a live database and ACC from files.
+You can also compare without connecting to the databases. Switch a card from **Database** to **Script files** and pick exported DDL scripts: **Choose files…** for one or more `.sql` files, or **Choose folder…** for a whole export folder. You can mix sources, for example the left side from a live database and the right side from files.
 
 To export with SSMS, right-click the database → **Tasks** → **Generate Scripts**. Under **Advanced**, set:
 
