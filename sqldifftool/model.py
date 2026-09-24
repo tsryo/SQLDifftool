@@ -118,6 +118,7 @@ class DbObject:
     note: str = ""                       # e.g. why a definition is unavailable
     table: TableDef | None = None        # tables and table types
     indexes: list[IndexDef] = field(default_factory=list)  # indexed views
+    attached: list[str] = field(default_factory=list)      # script files: constraint/index statements
 
     @property
     def key(self) -> str:
@@ -140,6 +141,7 @@ class Snapshot:
     extracted_at: str = ""
     warnings: list[dict] = field(default_factory=list)  # {"level": "warn"|"info", "text": ...}
     objects: list[DbObject] = field(default_factory=list)
+    source: str = "database"             # database | scripts
 
     def to_dict(self) -> dict:
         return asdict(self)

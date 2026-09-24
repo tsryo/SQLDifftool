@@ -210,6 +210,13 @@ input[type=checkbox] { accent-color: var(--ink); width: 15px; height: 15px; marg
 .auth-sql, .auth-connstr { display: none; }
 .side-card[data-auth=sql] .auth-sql { display: grid; }
 .side-card[data-auth=connstr] .auth-connstr { display: flex; }
+.src-db, .src-files { display: flex; flex-direction: column; gap: 12px; }
+.side-card[data-source=files] .src-db, .side-card:not([data-source=files]) .src-files { display: none; }
+.source-switch { align-self: flex-start; }
+.file-buttons { display: flex; gap: 8px; flex-wrap: wrap; }
+.file-buttons label.btn { cursor: pointer; }
+.file-summary { font-size: 13px; line-height: 1.5; }
+.file-summary ul { margin: 4px 0 0; padding-left: 18px; font-family: var(--mono); font-size: 12px; }
 .checks { display: flex; gap: 18px; flex-wrap: wrap; font-size: 13px; color: var(--text-2); }
 .checks label { display: inline-flex; align-items: center; gap: 7px; cursor: pointer; }
 .side-foot { display: flex; align-items: flex-start; gap: 12px; padding-top: 4px; border-top: 1px dashed var(--border); padding-top: 12px; }

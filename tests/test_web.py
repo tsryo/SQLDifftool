@@ -1,3 +1,4 @@
+import io
 import json
 import re
 
@@ -87,3 +88,49 @@ def test_profiles_never_store_passwords(client, tmp_path):
     assert "secret" not in stored and "se;cret" not in stored
     assert "Encrypt=yes" in stored
     assert client.delete("/api/profiles/Sales").get_json()["profiles"] == []
+
+
+def _upload(client, left_files, right_files, right_source="files"):
+    payload = {"left": {"label": "DEV", "source": "files"}, "right": {"label": "ACC", "source": right_source},
+               "options": {}, "excludes": []}
+    data = {"payload": json.dumps(payload),
+            "left_files": [(io.BytesIO(d), n) for n, d in left_files],
+            "right_files": [(io.BytesIO(d), n) for n, d in right_files]}
+    return client.post("/api/compare", data=data, content_type="multipart/form-data")
+
+
+def test_compare_script_files(client):
+    dev = [("DEV/dbo.T.sql", b"CREATE TABLE dbo.T (a int NOT NULL, b int NULL) ON [PRIMARY]\nGO\n"),
+           ("DEV/dbo.P.sql", b"CREATE PROCEDURE dbo.P AS SELECT 1\nGO\n")]
+    acc = [("ACC/all.sql", b"CREATE TABLE [dbo].[T] (a int NOT NULL)\nGO\nCREATE OR ALTER PROCEDURE dbo.P AS SELECT 1\n")]
+    res = _upload(client, dev, acc)
+    assert res.status_code == 200, res.get_json()
+    data = res.get_json()
+    assert data["left"]["server"] == "Script files" and data["left"]["database"] == "DEV"
+    status = {o["key"]: o["status"] for o in data["objects"]}
+    assert status == {"table|dbo|t": "different", "procedure|dbo|p": "identical"}
+    assert client.get(f"/api/compare/{data['id']}/report").status_code == 200
+
+
+def test_compare_script_files_errors(client):
+    res = _upload(client, [("a.sql", b"CREATE TABLE t (a int)")], [])
+    assert res.status_code == 400
+    assert res.get_json()["sideErrors"] == {"right": "Choose at least one .sql file."}
+    res = _upload(client, [("a.sql", b"CREATE TABLE t (a int)")], [("b.sql", b"SELECT 1")])
+    assert res.status_code == 400
+    assert "no CREATE statements" in res.get_json()["sideErrors"]["right"]
+
+
+def test_mixed_sources_warn(client, monkeypatch):
+    from sqldifftool import extractor
+    from sqldifftool.model import Snapshot
+
+    monkeypatch.setattr(extractor, "extract_snapshot", lambda spec: Snapshot(spec.label, "srv", "db"))
+    payload = {"left": {"label": "DEV", "source": "files"},
+               "right": {"label": "ACC", "source": "db", "server": "srv", "database": "db"}}
+    res = client.post("/api/compare", data={"payload": json.dumps(payload),
+                                            "left_files": [(io.BytesIO(b"CREATE TABLE t (a int)"), "a.sql")]},
+                      content_type="multipart/form-data")
+    assert res.status_code == 200, res.get_json()
+    warnings = res.get_json()["warnings"]["left"]
+    assert any("read from a database" in w["text"] for w in warnings)

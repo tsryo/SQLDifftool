@@ -33,6 +33,7 @@
     search: '',
     collapsed: new Set(),
     profiles: [],
+    files: { left: [], right: [] },
   };
 
   // ------------------------------------------------------------------ utils
@@ -43,10 +44,11 @@
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ESC[c]);
 
   async function api(method, url, body) {
+    const form = body instanceof FormData;
     const res = await fetch(url, {
       method,
-      headers: body === undefined ? {} : { 'Content-Type': 'application/json' },
-      body: body === undefined ? undefined : JSON.stringify(body),
+      headers: body === undefined || form ? {} : { 'Content-Type': 'application/json' },
+      body: body === undefined || form ? body : JSON.stringify(body),
     });
     let data = null;
     try { data = await res.json(); } catch (e) { /* not JSON */ }
@@ -142,6 +144,15 @@
     $('[data-f=database]', card).setAttribute('list', list.id);
     $('.side-hint', card).textContent = side === 'left' ? 'left side' : 'right side';
     $$('[data-auth]', card).forEach(b => b.addEventListener('click', () => { setAuth(side, b.dataset.auth); saveForm(); }));
+    $$('[data-source]', card).forEach(b => b.addEventListener('click', () => { setSource(side, b.dataset.source); saveForm(); }));
+    $$('[data-pick]', card).forEach(input => input.addEventListener('change', () => {
+      const picked = Array.from(input.files).filter(f => /\.sql$/i.test(f.name));
+      if (input.files.length && !picked.length) toast('No .sql files in the selection', 'error');
+      state.files[side] = picked;
+      input.value = '';
+      renderFiles(side);
+    }));
+    $('[data-act=clear-files]', card).addEventListener('click', () => { state.files[side] = []; renderFiles(side); });
     $('[data-act=test]', card).addEventListener('click', () => testConnection(side));
     $('[data-act=dbs]', card).addEventListener('click', () => loadDatabases(side));
     card.addEventListener('input', saveForm);
@@ -155,9 +166,35 @@
     $$('[data-auth]', card).forEach(b => b.setAttribute('aria-pressed', String(b.dataset.auth === auth)));
   }
 
+  function setSource(side, source) {
+    const card = $(`#card-${side}`);
+    card.dataset.source = source;
+    $$('[data-source]', card).forEach(b => b.setAttribute('aria-pressed', String(b.dataset.source === source)));
+  }
+
+  const fileName = f => f.webkitRelativePath || f.name;
+
+  function renderFiles(side) {
+    const files = state.files[side];
+    const out = $(`#card-${side} .file-summary`);
+    $(`#card-${side} .src-files .test-result`).textContent = '';
+    if (!files.length) {
+      out.textContent = 'No files chosen.';
+      return;
+    }
+    const size = files.reduce((n, f) => n + f.size, 0);
+    const kb = size < 1024 * 1024 ? `${Math.max(1, Math.round(size / 1024))} KB` : `${(size / 1048576).toFixed(1)} MB`;
+    const names = files.map(fileName).sort();
+    const shown = names.slice(0, 5).map(n => `<li>${esc(n)}</li>`).join('');
+    out.innerHTML = `${files.length} .sql file${files.length === 1 ? '' : 's'} &middot; ${kb}` +
+      `<ul>${shown}${names.length > 5 ? `<li>… and ${names.length - 5} more</li>` : ''}</ul>`;
+  }
+
+  const resultEl = side => $(`#card-${side} .src-${$(`#card-${side}`).dataset.source === 'files' ? 'files' : 'db'} .test-result`);
+
   function readSide(side) {
     const card = $(`#card-${side}`);
-    const spec = { auth: card.dataset.auth || 'windows' };
+    const spec = { auth: card.dataset.auth || 'windows', source: card.dataset.source || 'db' };
     $$('[data-f]', card).forEach(el => {
       const f = el.dataset.f;
       spec[f] = el.type === 'checkbox' ? el.checked : (f === 'password' ? el.value : el.value.trim());
@@ -176,8 +213,9 @@
     });
     if (!$('[data-f=label]', card).value) $('[data-f=label]', card).value = side === 'left' ? 'DEV' : 'ACC';
     setAuth(side, spec.auth || 'windows');
-    $('.test-result', card).textContent = '';
-    $('.test-result', card).className = 'test-result';
+    setSource(side, spec.source === 'files' ? 'files' : 'db');
+    $$('.test-result', card).forEach(el => { el.textContent = ''; el.className = 'test-result'; });
+    renderFiles(side);
   }
 
   function buildOptionCheckboxes() {
@@ -262,6 +300,7 @@
   function swapSides() {
     const l = readSide('left');
     const r = readSide('right');
+    state.files = { left: state.files.right, right: state.files.left };
     writeSide('left', r);
     writeSide('right', l);
     saveForm();
@@ -275,14 +314,22 @@
       excludes: readExcludes(),
     };
     $$('.test-result').forEach(el => { el.textContent = ''; el.className = 'test-result'; });
+    let request = body;
+    if (body.left.source === 'files' || body.right.source === 'files') {
+      request = new FormData();
+      request.append('payload', JSON.stringify(body));
+      ['left', 'right'].forEach(side => {
+        if (body[side].source === 'files') state.files[side].forEach(f => request.append(`${side}_files`, f, fileName(f)));
+      });
+    }
     showBusy(`Reading schemas from ${body.left.label} and ${body.right.label}…`);
     try {
-      const cmp = await api('POST', '/api/compare', body);
+      const cmp = await api('POST', '/api/compare', request);
       openComparison(cmp);
     } catch (e) {
       const sideErrors = (e.data && e.data.sideErrors) || {};
       Object.keys(sideErrors).forEach(side => {
-        const out = $(`#card-${side} .test-result`);
+        const out = resultEl(side);
         out.className = 'test-result err';
         out.textContent = sideErrors[side];
       });

@@ -40,6 +40,33 @@ Keyboard: `n`/`p` next/previous object, `/` search, `u` side-by-side ↔ unified
 
 To try the tool without a database, run `.\sqldifftool.cmd --demo`. It opens a built-in sample comparison.
 
+## Offline mode (script files)
+
+You can also compare without connecting to the databases. Switch a card from **Database** to **Script files** and pick exported DDL scripts: **Choose files…** for one or more `.sql` files, or **Choose folder…** for a whole export folder. You can mix sources, for example DEV from a live database and ACC from files.
+
+To export with SSMS, right-click the database → **Tasks** → **Generate Scripts**. Under **Advanced**, set:
+
+- **Check for object existence** = False. With True, SSMS wraps each object in `EXEC sp_executesql`, which the tool can't read.
+- **Script indexes**, **Script triggers**, **Script check constraints**, **Script foreign keys** = True (the defaults).
+
+Save as a single file or one file per object. Unicode (UTF-16) and UTF-8 both work.
+
+Script files are read like this:
+
+- **Split:** scripts are split on `GO`. `SET ANSI_NULLS` / `SET QUOTED_IDENTIFIER` carry over to the next module, as in live mode.
+- **Attached to their table:** `ALTER TABLE … ADD CONSTRAINT`, `NOCHECK CONSTRAINT` and `CREATE INDEX` statements. They are sorted, so export order doesn't matter.
+- **Dropped:**
+  - SSMS header comments (`Script Date: …`)
+  - storage clauses (`ON [PRIMARY]`, `TEXTIMAGE_ON`, `PAD_INDEX`, `FILLFACTOR`, `DATA_COMPRESSION`, …)
+  - redundant `WITH CHECK` / `CHECK CONSTRAINT`
+- **Ignore system-generated constraint names** also applies to names like `DF__Orders__Statu__3B75D760` in scripts.
+- **Skipped and reported:** statements that don't define a compared object, such as permissions or data. An object defined twice is reported too; the first definition wins.
+
+Limitations:
+
+- Tables from files are compared as normalized text, not rebuilt from the catalog. Scripts from different tools, or a database compared with files, can show formatting-only differences.
+- Collation and compatibility level are shown only if the script contains `CREATE DATABASE … COLLATE` / `ALTER DATABASE … SET COMPATIBILITY_LEVEL`.
+
 ## Options
 
 | Option | Default | Effect |

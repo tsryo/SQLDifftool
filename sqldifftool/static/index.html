@@ -92,6 +92,11 @@
     <input class="side-label" data-f="label" maxlength="16" aria-label="Environment label" spellcheck="false">
     <span class="side-hint"></span>
   </div>
+  <div class="segmented source-switch" role="group" aria-label="Schema source">
+    <button type="button" data-source="db">Database</button>
+    <button type="button" data-source="files">Script files</button>
+  </div>
+  <div class="src-db">
   <label class="field">
     <span>Server</span>
     <input data-f="server" placeholder="host\instance  or  host,port" autocomplete="off" spellcheck="false">
@@ -128,6 +133,20 @@
   </div>
   <div class="side-foot">
     <button type="button" class="btn" data-act="test">Test connection</button>
+    <div class="test-result" aria-live="polite"></div>
+  </div>
+  </div>
+  <div class="src-files">
+    <div class="field">
+      <span>Exported DDL scripts</span>
+      <div class="file-buttons">
+        <label class="btn">Choose files…<input type="file" data-pick="files" multiple accept=".sql" hidden></label>
+        <label class="btn">Choose folder…<input type="file" data-pick="folder" webkitdirectory multiple hidden></label>
+        <button type="button" class="btn ghost" data-act="clear-files">Clear</button>
+      </div>
+      <small>For example the output of SSMS <b>Generate Scripts</b>: one file, or a folder with one file per object. Only <code>.sql</code> files are read.</small>
+    </div>
+    <div class="file-summary muted" aria-live="polite"></div>
     <div class="test-result" aria-live="polite"></div>
   </div>
 </template>

@@ -1,6 +1,7 @@
 """Local web app: JSON API plus the single-page UI."""
 from __future__ import annotations
 
+import json
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -20,22 +21,60 @@ class ApiError(Exception):
         self.status, self.extra = status, extra
 
 
-def _extract_both(left: ConnectionSpec, right: ConnectionSpec):
+SCRIPT_FILES = "files"
+
+
+def _load_side(spec: ConnectionSpec, files: list[tuple[str, bytes]] | None):
+    if files is not None:
+        from .scriptparser import parse_scripts
+
+        return parse_scripts(files, spec.label)
     from .extractor import extract_snapshot  # imported lazily so demo mode needs no ODBC
 
+    return extract_snapshot(spec)
+
+
+def _load_both(left: ConnectionSpec, right: ConnectionSpec, files: dict[str, list | None]):
+    specs = {"left": left, "right": right}
     with ThreadPoolExecutor(max_workers=2) as pool:
-        futures = {"left": pool.submit(extract_snapshot, left), "right": pool.submit(extract_snapshot, right)}
+        futures = {side: pool.submit(_load_side, spec, files[side]) for side, spec in specs.items()}
         results, errors = {}, {}
         for side, fut in futures.items():
             try:
                 results[side] = fut.result()
+            except ValueError as exc:  # script files that cannot be used
+                errors[side] = str(exc)
             except Exception as exc:  # report both sides' failures at once
                 errors[side] = friendly_error(exc)
     if errors:
-        labels = {"left": left.label, "right": right.label}
-        summary = "; ".join(f"{labels[s]}: {m}" for s, m in errors.items())
+        summary = "; ".join(m if m.startswith(specs[s].label + ":") else f"{specs[s].label}: {m}"
+                            for s, m in errors.items())
         raise ApiError(f"Could not read the database schema. {summary}", sideErrors=errors)
-    return results["left"], results["right"]
+    left_snap, right_snap = results["left"], results["right"]
+    if left_snap.source != right_snap.source:
+        db_snap, file_snap = (left_snap, right_snap) if right_snap.source == "scripts" else (right_snap, left_snap)
+        file_snap.warnings.append({"level": "info", "text": (
+            f"{db_snap.label} was read from a database and {file_snap.label} from script files. Tables are "
+            "scripted differently from each source, so expect formatting-only differences.")})
+    return left_snap, right_snap
+
+
+def _compare_request() -> tuple[dict, dict[str, list | None]]:
+    """The compare body, and each side's uploaded script files (None for a database side)."""
+    if request.mimetype == "multipart/form-data":
+        try:
+            body = json.loads(request.form.get("payload") or "{}")
+        except json.JSONDecodeError as exc:
+            raise ApiError("Invalid request") from exc
+    else:
+        body = request.get_json(silent=True) or {}
+    files: dict[str, list | None] = {}
+    for side in ("left", "right"):
+        if (body.get(side) or {}).get("source") == SCRIPT_FILES:
+            files[side] = [(f.filename or "", f.read()) for f in request.files.getlist(f"{side}_files")]
+        else:
+            files[side] = None
+    return body, files
 
 
 def create_app(demo: bool = False, profiles_path: Path = DEFAULT_PATH) -> Flask:
@@ -114,14 +153,19 @@ def create_app(demo: bool = False, profiles_path: Path = DEFAULT_PATH) -> Flask:
 
     @app.post("/api/compare")
     def compare():
-        body = request.get_json(silent=True) or {}
+        body, files = _compare_request()
         left = ConnectionSpec.from_dict(body.get("left"))
         right = ConnectionSpec.from_dict(body.get("right"))
-        for spec in (left, right):
+        for side, spec in (("left", left), ("right", right)):
+            if files[side] is not None:
+                if not files[side]:
+                    raise ApiError(f"{spec.label}: choose at least one .sql file",
+                                   sideErrors={side: "Choose at least one .sql file."})
+                continue
             spec.validate()
             if spec.auth != "connstr" and not spec.database:
                 raise ApiError(f"{spec.label}: database is required")
-        left_snap, right_snap = _extract_both(left, right)
+        left_snap, right_snap = _load_both(left, right, files)
         cmp = Comparison(left_snap, right_snap, CompareOptions.from_dict(body.get("options")),
                          body.get("excludes") or [])
         return store.add(cmp).payload()

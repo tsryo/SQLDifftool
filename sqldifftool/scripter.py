@@ -6,6 +6,8 @@ partition schemes, compression), which are expected to differ per environment.
 """
 from __future__ import annotations
 
+import re
+
 from .model import (CheckDef, ColumnDef, DbObject, ForeignKeyDef, IndexColumn, IndexDef,
                     KeyConstraintDef, TableDef)
 
@@ -43,13 +45,44 @@ def script_object(obj: DbObject, db_collation: str, ignore_system_names: bool = 
             return script_table(obj, db_collation, ignore_system_names)
         return script_table_type(obj, db_collation, ignore_system_names)
     if obj.category in ("View", "Procedure", "Function", "Trigger"):
-        return script_module(obj)
-    return obj.definition or f"-- {obj.note or 'Definition not available'}"
+        return script_module(obj, ignore_system_names)
+    text = obj.definition or f"-- {obj.note or 'Definition not available'}"
+    if obj.category in ("Table", "Type"):
+        # Read from a script file: the table is text, not structured.
+        text = "\n".join([mask_system_names(text, ignore_system_names)]
+                         + _attached(obj, ignore_system_names))
+    return text
+
+
+# --- script-file objects ---------------------------------------------------
+
+# SQL Server's generated constraint names, e.g. DF__Orders__Statu__3B75D760.
+_SYSTEM_NAME = r"(?:PK|UQ|DF|CK|FK)__\w+?__[0-9A-F]{8,16}"
+_SYSTEM_CONSTRAINT = re.compile(rf"(?i:\bCONSTRAINT)\s+(?:\[{_SYSTEM_NAME}\]|\b{_SYSTEM_NAME}\b)\s*")
+_SYSTEM_REF = re.compile(rf"\[{_SYSTEM_NAME}\]|\b{_SYSTEM_NAME}\b")
+_NOCHECK = re.compile(r"(?i)^ALTER\s+TABLE\b.*\bNOCHECK\s+CONSTRAINT\b", re.S)
+
+
+def mask_system_names(text: str, ignore_system_names: bool = True) -> str:
+    """Hide system-generated constraint names in scripted text, as the table scripter does."""
+    if not ignore_system_names:
+        return text
+    return _SYSTEM_REF.sub(SYSTEM_NAME_PLACEHOLDER, _SYSTEM_CONSTRAINT.sub("", text))
+
+
+def _attached(obj: DbObject, ignore_system_names: bool) -> list[str]:
+    """Constraint and index statements from script files, in an order that does not depend on the export."""
+    def rank(text: str) -> int:
+        if _NOCHECK.match(text):
+            return 1
+        return 0 if text[:5].upper() == "ALTER" else 2
+    stmts = [mask_system_names(s, ignore_system_names) for s in obj.attached]
+    return sorted(stmts, key=lambda s: (rank(s), s.lower()))
 
 
 # --- modules ---------------------------------------------------------------
 
-def script_module(obj: DbObject) -> str:
+def script_module(obj: DbObject, ignore_system_names: bool = True) -> str:
     parts = []
     if not obj.ansi_nulls:
         parts.append("SET ANSI_NULLS OFF;")
@@ -63,6 +96,9 @@ def script_module(obj: DbObject) -> str:
     for ix in sorted(obj.indexes, key=lambda i: i.name.lower()):
         parts.append("GO")
         parts.append(_index_statement(target, ix))
+    for stmt in _attached(obj, ignore_system_names):
+        parts.append("GO")
+        parts.append(stmt)
     if obj.category == "Trigger" and obj.disabled:
         on = obj.parent if obj.parent else "DATABASE"
         parts.append("GO")

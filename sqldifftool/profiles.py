@@ -6,7 +6,7 @@ import re
 from pathlib import Path
 
 DEFAULT_PATH = Path.home() / ".sqldifftool" / "profiles.json"
-SIDE_FIELDS = ("label", "server", "database", "auth", "username", "connection_string",
+SIDE_FIELDS = ("label", "source", "server", "database", "auth", "username", "connection_string",
                "encrypt", "trust_server_certificate")
 _PASSWORD_IN_CONNSTR = re.compile(r"(?i)(^|;)\s*(pwd|password)\s*=\s*(\{(?:[^}]|\}\})*\}|[^;]*)")
 
